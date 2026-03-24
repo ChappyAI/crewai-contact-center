@@ -1,2 +1,0 @@
-[console_scripts]
-crewai_contact_center = crewai_contact_center.main:run
