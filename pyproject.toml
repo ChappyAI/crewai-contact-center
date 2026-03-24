@@ -1,0 +1,18 @@
+[project]
+name = "crewai-contact-center"
+version = "0.1.0"
+description = "AllTalkPro Contact Center AI Crew"
+requires-python = ">=3.10"
+dependencies = [
+    "crewai[tools]>=0.11.0,<1.0.0",
+]
+
+[project.scripts]
+crewai_contact_center = "crewai_contact_center.main:run"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

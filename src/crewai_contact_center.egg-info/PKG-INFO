@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: crewai-contact-center
+Version: 0.1.0
+Summary: AllTalkPro Contact Center AI Crew
+Requires-Python: >=3.10
+Requires-Dist: crewai[tools]<1.0.0,>=0.11.0

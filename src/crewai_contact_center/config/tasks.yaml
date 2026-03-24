@@ -1,0 +1,79 @@
+score_lead_task:
+  description: >
+    Analyze the following call data and score the lead on a 1-100 scale.
+    Consider: caller engagement level, sentiment trajectory, call duration,
+    questions asked, buying signals, and objections raised.
+
+    Call ID: {call_id}
+    Tenant ID: {tenant_id}
+    Transcript: {transcript}
+    Call Duration: {duration_seconds}s
+    Sentiment: {sentiment}
+    Agent Notes: {agent_notes}
+  expected_output: >
+    JSON with: score (1-100), qualification (hot/warm/cold), reasoning,
+    recommended_action (schedule_callback/send_collateral/close/nurture),
+    priority_rank, and key_signals detected.
+  agent: lead_scoring_agent
+
+evaluate_call_quality_task:
+  description: >
+    Score this completed call against QA criteria.
+
+    Call ID: {call_id}
+    Transcript: {transcript}
+    Duration: {duration_seconds}s
+    Disposition: {disposition}
+    Agent ID: {agent_id}
+  expected_output: >
+    JSON with: overall_score (1-100), criteria scores (greeting, listening,
+    problem_id, solution, compliance, professionalism, efficiency, resolution),
+    strengths, improvements, compliance_flags, coaching_recommendations.
+  agent: call_quality_analyst
+
+optimize_routing_task:
+  description: >
+    Recommend optimal routing for this incoming call.
+
+    Caller Number: {caller_number}
+    Caller History: {caller_history}
+    Available Agents: {available_agents}
+    Queue Depths: {queue_depths}
+    Current SLA: {sla_metrics}
+  expected_output: >
+    JSON with: recommended_queue, recommended_agent_id, priority (1-10),
+    reasoning, estimated_wait_seconds, skill_match_score.
+  agent: routing_strategist
+
+optimize_campaign_task:
+  description: >
+    Analyze campaign performance and recommend optimizations.
+
+    Campaign ID: {campaign_id}
+    Period: {analysis_period}
+    Contact Rate: {contact_rate}%
+    Answer Rate: {answer_rate}%
+    Conversion Rate: {conversion_rate}%
+    Abandon Rate: {abandon_rate}%
+    Avg Handle Time: {avg_handle_time}s
+    List Size Remaining: {list_remaining}
+  expected_output: >
+    JSON with: recommendations (dial_rate_adjustment, best_call_times,
+    list_segmentation_suggestions, agent_allocation), predicted_improvement,
+    risk_factors, priority_actions.
+  agent: campaign_optimizer
+
+analyze_sentiment_task:
+  description: >
+    Analyze real-time sentiment from this transcript chunk.
+
+    Call ID: {call_id}
+    Agent ID: {agent_id}
+    Transcript Chunk: {transcript_chunk}
+    Previous Sentiment: {previous_sentiment}
+    Call Duration So Far: {elapsed_seconds}s
+  expected_output: >
+    JSON with: sentiment (positive/neutral/negative), score (0-1),
+    emotions detected, trend (improving/stable/declining),
+    alert (true/false for escalation), coaching_tip if needed.
+  agent: sentiment_tracker
