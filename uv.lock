@@ -648,7 +648,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "crewai", extras = ["tools"], specifier = ">=0.11.0,<1.0.0" }]
+requires-dist = [{ name = "crewai", extras = ["tools"], specifier = ">=0.203.0" }]
 
 [[package]]
 name = "crewai-tools"
