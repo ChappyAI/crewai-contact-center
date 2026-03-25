@@ -1,6 +1,8 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 
+from crewai_contact_center.tools import analyze_transcript, calculate_qa_score, score_lead
+
 
 @CrewBase
 class ContactCenterCrew:
@@ -19,11 +21,19 @@ class ContactCenterCrew:
 
     @agent
     def lead_scoring_agent(self) -> Agent:
-        return Agent(config=self.agents_config["lead_scoring_agent"], verbose=True)
+        return Agent(
+            config=self.agents_config["lead_scoring_agent"],
+            tools=[analyze_transcript, score_lead],
+            verbose=True,
+        )
 
     @agent
     def call_quality_analyst(self) -> Agent:
-        return Agent(config=self.agents_config["call_quality_analyst"], verbose=True)
+        return Agent(
+            config=self.agents_config["call_quality_analyst"],
+            tools=[analyze_transcript, calculate_qa_score],
+            verbose=True,
+        )
 
     @agent
     def routing_strategist(self) -> Agent:
@@ -35,7 +45,11 @@ class ContactCenterCrew:
 
     @agent
     def sentiment_tracker(self) -> Agent:
-        return Agent(config=self.agents_config["sentiment_tracker"], verbose=True)
+        return Agent(
+            config=self.agents_config["sentiment_tracker"],
+            tools=[analyze_transcript],
+            verbose=True,
+        )
 
     @task
     def score_lead_task(self) -> Task:
