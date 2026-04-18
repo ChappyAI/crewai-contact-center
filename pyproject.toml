@@ -1,7 +1,7 @@
 [project]
 name = "crewai-contact-center"
 version = "0.1.0"
-description = "AllTalkPro Contact Center AI Crew"
+description = "Con.Nexus Contact Center AI Crew"
 requires-python = ">=3.10"
 dependencies = [
     "crewai[tools]>=1.11.0",

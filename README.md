@@ -1,4 +1,4 @@
-# AllTalkPro Contact Center AI Crew
+# Con.Nexus Contact Center AI Crew
 
 ## Deploy to CrewAI Enterprise
 

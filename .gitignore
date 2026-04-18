@@ -25,3 +25,8 @@ Thumbs.db
 
 # Logs
 *.log
+.claude/
+.iceteam/
+.kombai/
+.kilo/
+.kilocode/

@@ -6,7 +6,7 @@ from crewai_contact_center.tools import analyze_transcript, calculate_qa_score, 
 
 @CrewBase
 class ContactCenterCrew:
-    """AllTalkPro Contact Center AI Crew
+    """Con.Nexus Contact Center AI Crew
 
     Multi-agent crew for contact center intelligence:
     - Lead scoring and qualification
