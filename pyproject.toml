@@ -1,14 +1,18 @@
 [project]
 name = "crewai-contact-center"
-version = "0.1.0"
-description = "Con.Nexus Contact Center AI Crew"
+version = "0.2.0"
+description = "Con.Nexus Contact Center AI Crew (self-hosted HTTP service)"
 requires-python = ">=3.10"
 dependencies = [
     "crewai[tools]>=1.11.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.7.0",
 ]
 
 [project.scripts]
 crewai_contact_center = "crewai_contact_center.main:run"
+crewai_contact_center_api = "crewai_contact_center.api:serve"
 
 [build-system]
 requires = ["setuptools", "wheel"]
