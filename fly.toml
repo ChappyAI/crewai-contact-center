@@ -7,6 +7,8 @@ primary_region = "iad"
   PORT = "8000"
   LOG_LEVEL = "info"
   CREW_MAX_WORKERS = "4"
+  LANGSMITH_PROJECT = "crewai-contact-center"
+  LANGSMITH_TRACING = "true"
 
 [http_service]
   internal_port = 8000
