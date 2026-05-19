@@ -21,6 +21,10 @@ from typing import Any
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from crewai_contact_center.crew import ContactCenterCrew
 
 logger = logging.getLogger("crewai_contact_center.api")
