@@ -20,3 +20,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"crewai_contact_center" = ["config/*.yaml"]
