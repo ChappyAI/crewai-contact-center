@@ -85,11 +85,23 @@ class StatusResponse(BaseModel):
 def _verify_auth(authorization: str | None = Header(default=None)) -> None:
     expected = os.getenv("CREWAI_API_KEY")
     if not expected:
-        return
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Service not configured: CREWAI_API_KEY not set")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
     if authorization.removeprefix("Bearer ").strip() != expected:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid bearer token")
+
+
+def _check_api_key_configured() -> None:
+    """Validate CREWAI_API_KEY is set at import time / startup."""
+    if not os.getenv("CREWAI_API_KEY"):
+        raise RuntimeError(
+            "CREWAI_API_KEY environment variable is required but not set. "
+            "Refusing to start without authentication configured."
+        )
+
+
+_check_api_key_configured()
 
 
 def _run_crew(kickoff_id: str, inputs: dict[str, Any]) -> None:
