@@ -10,6 +10,7 @@ were originally built against the managed product:
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -27,8 +28,27 @@ load_dotenv()
 
 from crewai_contact_center.crew import ContactCenterCrew
 
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_obj = {
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "service": "crewai-contact-center",
+            "message": record.getMessage(),
+            "module": record.module,
+        }
+        if record.exc_info:
+            log_obj["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_obj)
+
+
+handler = logging.StreamHandler()
+handler.setFormatter(JSONFormatter())
+logging.root.handlers = [handler]
+logging.root.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
+
 logger = logging.getLogger("crewai_contact_center.api")
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 
 REQUIRED_INPUTS: list[str] = [
     "call_id",
