@@ -43,8 +43,10 @@ fly secrets set CREWAI_API_URL=https://crewai-contact-center.fly.dev \
 
 ## API
 
-All endpoints require `Authorization: Bearer $CREWAI_API_KEY` when the
-`CREWAI_API_KEY` env var is set. If unset, auth is disabled (local dev only).
+All protected endpoints require both a configured `CREWAI_API_KEY` and
+`Authorization: Bearer $CREWAI_API_KEY`. If the key is unset, protected
+endpoints fail closed with `503`. `POST /kickoff` and
+`GET /status/{kickoff_id}` also require `x-tenant-id`.
 
 ```bash
 # 1. List required inputs
@@ -54,16 +56,22 @@ curl -H "Authorization: Bearer $CREWAI_API_KEY" \
 # 2. Kick off a run (returns kickoff_id immediately)
 curl -X POST https://crewai-contact-center.fly.dev/kickoff \
      -H "Authorization: Bearer $CREWAI_API_KEY" \
+     -H "x-tenant-id: $TENANT_ID" \
      -H "Content-Type: application/json" \
-     -d '{"inputs": {"call_id": "abc", "transcript": "...", "tenant_id": "..."}}'
+     -d @payload.json
 
 # 3. Poll status
 curl -H "Authorization: Bearer $CREWAI_API_KEY" \
+     -H "x-tenant-id: $TENANT_ID" \
      https://crewai-contact-center.fly.dev/status/<kickoff_id>
 
 # 4. Health (unauthenticated, for Fly checks)
 curl https://crewai-contact-center.fly.dev/health
 ```
+
+`payload.json` must include every key returned by `GET /inputs` under the
+top-level `inputs` object. Its `inputs.tenant_id` must match the `x-tenant-id`
+header.
 
 Status values: `running`, `completed`, `failed`. Run state is in-memory; if
 the machine restarts mid-run, the kickoff is lost and the parent must retry.
@@ -71,5 +79,5 @@ the machine restarts mid-run, the kickoff is lost and the parent must retry.
 ## Required inputs
 
 See `GET /inputs` or the `REQUIRED_INPUTS` list in `src/crewai_contact_center/api.py`.
-Missing keys are filled with empty strings so YAML task templating never raises,
-but agents will produce low-quality output without real data.
+Missing or blank required keys are rejected with `422`; production callers must
+send explicit real values instead of relying on synthetic defaults.

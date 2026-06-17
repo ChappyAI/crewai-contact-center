@@ -11,6 +11,7 @@ were originally built against the managed product:
 from __future__ import annotations
 
 import logging
+import hmac
 import os
 import threading
 import time
@@ -19,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from dotenv import load_dotenv
 
@@ -64,15 +65,21 @@ _kickoffs_lock = threading.Lock()
 
 
 class KickoffRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     inputs: dict[str, Any] = Field(default_factory=dict)
 
 
 class KickoffResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     kickoff_id: str
     state: str
 
 
 class StatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     kickoff_id: str
     state: str  # running | completed | error  (matches telephony-service connector contract)
     started_at: float
@@ -83,21 +90,40 @@ class StatusResponse(BaseModel):
 
 
 def _verify_auth(authorization: str | None = Header(default=None)) -> None:
-    expected = os.getenv("CREWAI_API_KEY")
+    expected = os.getenv("CREWAI_API_KEY", "").strip()
     if not expected:
-        return
+        logger.error("CREWAI_API_KEY is not configured; refusing protected request")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "CREWAI_API_KEY is required",
+        )
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
-    if authorization.removeprefix("Bearer ").strip() != expected:
+    token = authorization.removeprefix("Bearer ").strip()
+    if not hmac.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid bearer token")
+
+
+def _validate_tenant_scope(x_tenant_id: str | None, tenant_id: Any) -> str:
+    if not isinstance(tenant_id, str) or not tenant_id.strip():
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            {"message": "tenant_id must be a non-empty string"},
+        )
+    expected = tenant_id.strip()
+    actual = (x_tenant_id or "").strip()
+    if not actual:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "missing x-tenant-id")
+    if not hmac.compare_digest(actual.encode("utf-8"), expected.encode("utf-8")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "tenant mismatch")
+    return expected
 
 
 def _run_crew(kickoff_id: str, inputs: dict[str, Any]) -> None:
     started = _kickoffs[kickoff_id]["started_at"]
     try:
-        merged = _merge_with_defaults(inputs)
-        logger.info("kickoff %s starting (call_id=%s)", kickoff_id, merged.get("call_id"))
-        result = ContactCenterCrew().crew().kickoff(inputs=merged)
+        logger.info("kickoff %s starting (call_id=%s)", kickoff_id, inputs.get("call_id"))
+        result = ContactCenterCrew().crew().kickoff(inputs=inputs)
         with _kickoffs_lock:
             _kickoffs[kickoff_id].update(
                 state="completed",
@@ -117,12 +143,33 @@ def _run_crew(kickoff_id: str, inputs: dict[str, Any]) -> None:
             )
 
 
-def _merge_with_defaults(inputs: dict[str, Any]) -> dict[str, Any]:
-    """Fill missing required keys with empty strings so YAML templating never KeyErrors.
+def _validate_required_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Reject incomplete live-call inputs instead of synthesizing defaults."""
+    missing = [key for key in REQUIRED_INPUTS if key not in inputs]
+    blank = [
+        key
+        for key in REQUIRED_INPUTS
+        if key in inputs and _is_blank_required_value(inputs[key])
+    ]
+    if missing or blank:
+        detail: dict[str, Any] = {
+            "message": "missing or blank required CrewAI inputs",
+            "required_inputs": REQUIRED_INPUTS,
+        }
+        if missing:
+            detail["missing_inputs"] = missing
+        if blank:
+            detail["blank_inputs"] = blank
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail)
+    return dict(inputs)
 
-    Crew tasks template via {var} substitution; a missing key crashes the run.
-    """
-    return {key: inputs.get(key, "") for key in REQUIRED_INPUTS} | inputs
+
+def _is_blank_required_value(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    return False
 
 
 def _serialize_result(result: Any) -> Any:
@@ -153,10 +200,17 @@ def list_inputs(_: None = Depends(_verify_auth)) -> dict[str, list[str]]:
 
 
 @app.post("/kickoff", response_model=KickoffResponse)
-def kickoff(req: KickoffRequest, _: None = Depends(_verify_auth)) -> KickoffResponse:
+def kickoff(
+    req: KickoffRequest,
+    _: None = Depends(_verify_auth),
+    x_tenant_id: str | None = Header(default=None, alias="x-tenant-id"),
+) -> KickoffResponse:
+    inputs = _validate_required_inputs(req.inputs)
+    tenant_id = _validate_tenant_scope(x_tenant_id, inputs["tenant_id"])
     kickoff_id = str(uuid.uuid4())
     with _kickoffs_lock:
         _kickoffs[kickoff_id] = {
+            "tenant_id": tenant_id,
             "state": "running",
             "started_at": time.time(),
             "finished_at": None,
@@ -164,17 +218,32 @@ def kickoff(req: KickoffRequest, _: None = Depends(_verify_auth)) -> KickoffResp
             "result": None,
             "error": None,
         }
-    _executor.submit(_run_crew, kickoff_id, req.inputs)
+    _executor.submit(_run_crew, kickoff_id, inputs)
     return KickoffResponse(kickoff_id=kickoff_id, state="running")
 
 
 @app.get("/status/{kickoff_id}", response_model=StatusResponse)
-def get_status(kickoff_id: str, _: None = Depends(_verify_auth)) -> StatusResponse:
+def get_status(
+    kickoff_id: str,
+    _: None = Depends(_verify_auth),
+    x_tenant_id: str | None = Header(default=None, alias="x-tenant-id"),
+) -> StatusResponse:
+    tenant_id = (x_tenant_id or "").strip()
+    if not tenant_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "missing x-tenant-id")
     with _kickoffs_lock:
         record = _kickoffs.get(kickoff_id)
-    if not record:
+    record_tenant_id = record.get("tenant_id") if record else None
+    if (
+        not record
+        or not isinstance(record_tenant_id, str)
+        or not hmac.compare_digest(
+            tenant_id.encode("utf-8"), record_tenant_id.encode("utf-8")
+        )
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown kickoff_id: {kickoff_id}")
-    return StatusResponse(kickoff_id=kickoff_id, **record)
+    response_record = {key: value for key, value in record.items() if key != "tenant_id"}
+    return StatusResponse(kickoff_id=kickoff_id, **response_record)
 
 
 def serve() -> None:

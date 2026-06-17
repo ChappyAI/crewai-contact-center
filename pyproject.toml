@@ -10,6 +10,12 @@ dependencies = [
     "pydantic>=2.7.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.27.0",
+    "pytest>=8.0.0",
+]
+
 [project.scripts]
 crewai_contact_center = "crewai_contact_center.main:run"
 crewai_contact_center_api = "crewai_contact_center.api:serve"
