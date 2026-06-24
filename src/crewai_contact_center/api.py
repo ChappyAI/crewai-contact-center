@@ -19,6 +19,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+import logfire
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,6 +31,12 @@ from crewai_contact_center.crew import ContactCenterCrew
 
 logger = logging.getLogger("crewai_contact_center.api")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+
+logfire.configure(
+    token=os.getenv("LOGFIRE_TOKEN"),
+    service_name="crewai-contact-center",
+    send_to_logfire="if-token-present",
+)
 
 REQUIRED_INPUTS: list[str] = [
     "call_id",
@@ -185,6 +192,7 @@ app = FastAPI(
     description="Self-hosted CrewAI runtime mirroring CrewAI Enterprise endpoints.",
     version="0.2.0",
 )
+logfire.instrument_fastapi(app)
 
 
 @app.get("/health")
