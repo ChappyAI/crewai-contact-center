@@ -10,7 +10,7 @@ Con.Nexus Contact Center AI Crew — a self-hosted HTTP service running 5 CrewAI
 
 ## Deployed
 - **Fly.io**: `https://crewai-contact-center.fly.dev`
-- **Auth**: Currently disabled (no CREWAI_API_KEY set — add one for production)
+- **Auth**: Bearer auth enabled with `CREWAI_API_KEY`; `telephony-service` must use the same value and sends it as `Authorization: Bearer <CREWAI_API_KEY>`
 - **Region**: iad (us-east-1)
 - **Machine**: 6835e7ebd69658, shared CPU 1, 1GB RAM
 - **Docker**: `Dockerfile` builds from `python:3.11-slim`, installs deps, runs `crewai_contact_center_api`
@@ -27,11 +27,14 @@ Con.Nexus Contact Center AI Crew — a self-hosted HTTP service running 5 CrewAI
 - MODEL=gpt-4-turbo
 - OPENAI_API_KEY — set in Fly secrets and .env
 - LANGSMITH_API_KEY — set in Fly secrets and .env
+- CREWAI_API_URL=https://crewai-contact-center.fly.dev
+- CREWAI_API_KEY — shared bearer token aligned with `telephony-service`
 - PORT=8000, LOG_LEVEL=info, CREW_MAX_WORKERS=4
 
 ## Fly Secrets
 Set via `flyctl secrets set`:
 - MODEL, OPENAI_API_KEY, LANGSMITH_API_KEY, PORT, LOG_LEVEL, CREW_MAX_WORKERS, LANGSMITH_PROJECT, LANGSMITH_TRACING
+- CREWAI_API_URL, CREWAI_API_KEY, CREWAI_USER_TOKEN, CREWAI_MCP_TOKEN
 
 ## Key Files
 - `src/crewai_contact_center/api.py` — FastAPI app, entrypoint `serve()`, loads `.env` via `load_dotenv()`
@@ -43,13 +46,20 @@ Set via `flyctl secrets set`:
 - `Dockerfile` — Multi-stage build for Fly.io deployment
 - `fly.toml` — Fly.io app config (auto-stop enabled, min_machines=0)
 
-## Recent Session History (May 19, 2026)
+## Recent Session History
+
+### June 12, 2026
+1. Re-pointed production CrewAI wiring to the self-hosted contact-center runtime: `https://crewai-contact-center.fly.dev`.
+2. Synced `CREWAI_API_KEY` between `telephony-service` and `crewai-contact-center`; do not use `JWT_TOKEN` for direct CrewAI calls.
+3. Verified production mock-call flow: `/health` 200, `/inputs` 200 with 24 required inputs, `/kickoff` 200, `/status/{id}` completed.
+
+### May 19, 2026
 1. Merged stale branches into main: `chore/update-env-config` (env config) and `claude/codebase-reference-docs-Jaucc` (references.md)
 2. Fixed `api.py` to call `load_dotenv()` at startup (PR #2)
 3. Fixed `pyproject.toml` to bundle `config/*.yaml` as package data (PR #3) — critical fix, without this the crew errors with `KeyError: 'score_lead_task'`
 4. Deployed to Fly.io with secrets
 5. Set up ngrok tunnel for local testing (may still be running)
-6. Removed CREWAI_API_KEY from secrets — API currently has no auth
+6. Historical note: auth had previously been disabled; production now requires `CREWAI_API_KEY`.
 
 ## Local Dev
 ```bash

@@ -544,8 +544,8 @@ The CrewAI Enterprise runtime auto-generates these endpoints from the `@CrewBase
 | Method | Path                       | Purpose                                                                            | Auth                                |
 | ------ | -------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
 | GET    | `/inputs`                  | Discover the input keys the crew expects.                                          | Bearer token (deployment API key)   |
-| POST   | `/kickoff`                 | Start an asynchronous crew run. Body: `{ "inputs": { ... } }`. Returns `{ kickoff_id }`. | Bearer token                        |
-| GET    | `/status/{kickoff_id}`     | Poll status. Returns `{ state, result }`. `state` ∈ `pending`, `running`, `completed`, `error`. | Bearer token                        |
+| POST   | `/kickoff`                 | Start an asynchronous crew run. Body must include every key returned by `GET /inputs` under `inputs`; `inputs.tenant_id` must match `x-tenant-id`. Returns `{ kickoff_id }`. | Bearer token + `x-tenant-id` |
+| GET    | `/status/{kickoff_id}`     | Poll tenant-scoped status. Returns `{ state, result }`. `state` ∈ `pending`, `running`, `completed`, `error`. | Bearer token + `x-tenant-id` |
 | GET    | `/health`                  | Liveness probe (used by consumer connector's `healthCheck()`).                     | None                                |
 
 The consumer integration (NestJS `CrewAiConnector`, see Section 12) uses the kickoff-then-poll pattern with a 2s poll interval and up to 60 attempts (~2 minutes total) before timing out.
@@ -560,23 +560,19 @@ curl -H "Authorization: Bearer $CREWAI_API_KEY" \
 # Kick off the crew
 curl -X POST "$CREWAI_API_URL/kickoff" \
   -H "Authorization: Bearer $CREWAI_API_KEY" \
+  -H "x-tenant-id: $TENANT_ID" \
   -H "Content-Type: application/json" \
-  -d '{
-    "inputs": {
-      "call_id": "abc",
-      "transcript": "...",
-      "duration_seconds": 180,
-      "sentiment": "neutral",
-      ...
-    }
-  }'
+  -d @payload.json
 # → { "kickoff_id": "kid_..." }
 
 # Poll until terminal
 curl -H "Authorization: Bearer $CREWAI_API_KEY" \
+  -H "x-tenant-id: $TENANT_ID" \
   "$CREWAI_API_URL/status/kid_..."
 # → { "state": "completed", "result": "..." }
 ```
+
+`payload.json` must contain every required input returned by `GET /inputs`; missing or blank required fields are rejected, and `inputs.tenant_id` must match `x-tenant-id`.
 
 Source refs: [README.md](./README.md), `con-nexus-telephony/src/modules/ai-agency/connectors/crewai-connector.ts`.
 
@@ -724,13 +720,13 @@ analyze_sentiment_task ──► sentiment_tracker ──► analyze_transcript
 con-nexus-telephony (NestJS)
    │  CrewAiConnector.execute(request)
    ▼
-POST  https://<crew>.crewai.com/kickoff   { "inputs": { tenant_id, call_id, agent_id, ... } }
+POST  https://<crew>.crewai.com/kickoff   { "inputs": "<all GET /inputs keys>" } + x-tenant-id
    │
    ▼
 { "kickoff_id": "kid_..." }
    │  poll every 2s up to 60 times
    ▼
-GET   https://<crew>.crewai.com/status/kid_...
+GET   https://<crew>.crewai.com/status/kid_... + x-tenant-id
    │
    ▼
 { "state": "completed", "result": "<final task output>" }
