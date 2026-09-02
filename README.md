@@ -43,9 +43,9 @@ fly secrets set CREWAI_API_URL=https://crewai-contact-center.fly.dev \
 
 ## API
 
-All protected endpoints require both a configured `CREWAI_API_KEY` and
-`Authorization: Bearer $CREWAI_API_KEY`. If the key is unset, protected
-endpoints fail closed with `503`. `POST /kickoff` and
+`CREWAI_API_KEY` is **required** — the service refuses to start without it
+(raises `RuntimeError` at import time). All endpoints except `/health` require
+`Authorization: Bearer $CREWAI_API_KEY`. `POST /kickoff` and
 `GET /status/{kickoff_id}` also require `x-tenant-id`.
 
 ```bash

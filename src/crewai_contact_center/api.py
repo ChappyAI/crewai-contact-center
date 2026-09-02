@@ -10,6 +10,7 @@ were originally built against the managed product:
 """
 from __future__ import annotations
 
+import json
 import logging
 import hmac
 import os
@@ -29,8 +30,33 @@ load_dotenv()
 
 from crewai_contact_center.crew import ContactCenterCrew
 
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_obj = {
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "service": "crewai-contact-center",
+            "message": record.getMessage(),
+            "module": record.module,
+        }
+        if record.exc_info:
+            log_obj["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_obj)
+
+
+_json_formatter = JSONFormatter()
+handler = logging.StreamHandler()
+handler.setFormatter(_json_formatter)
+logging.root.handlers = [handler]
+logging.root.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
+
+for _uvi_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+    _uvi_logger = logging.getLogger(_uvi_name)
+    _uvi_logger.handlers = [handler]
+    _uvi_logger.propagate = False
+
 logger = logging.getLogger("crewai_contact_center.api")
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 
 logfire.configure(
     token=os.getenv("LOGFIRE_TOKEN"),
@@ -111,6 +137,17 @@ def _verify_auth(authorization: str | None = Header(default=None)) -> None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid bearer token")
 
 
+def _check_api_key_configured() -> None:
+    if not os.getenv("CREWAI_API_KEY"):
+        raise RuntimeError(
+            "CREWAI_API_KEY environment variable is required but not set. "
+            "Refusing to start without authentication configured."
+        )
+
+
+_check_api_key_configured()
+
+
 def _validate_tenant_scope(x_tenant_id: str | None, tenant_id: Any) -> str:
     if not isinstance(tenant_id, str) or not tenant_id.strip():
         raise HTTPException(
@@ -151,7 +188,6 @@ def _run_crew(kickoff_id: str, inputs: dict[str, Any]) -> None:
 
 
 def _validate_required_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    """Reject incomplete live-call inputs instead of synthesizing defaults."""
     missing = [key for key in REQUIRED_INPUTS if key not in inputs]
     blank = [
         key
